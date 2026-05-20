@@ -4,11 +4,15 @@ import 'package:flutter/material.dart';
 class ErrorDisplayWidget extends StatelessWidget {
   final String message;
   final VoidCallback? onRetry;
+  final String? settingsButtonLabel;
+  final VoidCallback? onOpenSettings;
 
   const ErrorDisplayWidget({
     super.key,
     required this.message,
     this.onRetry,
+    this.settingsButtonLabel,
+    this.onOpenSettings,
   });
 
   @override
@@ -21,26 +25,43 @@ class ErrorDisplayWidget extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.red.shade200),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Icon(Icons.error_outline, color: Colors.red.shade700, size: 28),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              message,
-              style: TextStyle(
-                color: Colors.red.shade900,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
+          Row(
+            children: [
+              Icon(Icons.error_outline, color: Colors.red.shade700, size: 28),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  message,
+                  style: TextStyle(
+                    color: Colors.red.shade900,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              if (onRetry != null)
+                IconButton(
+                  onPressed: onRetry,
+                  icon: Icon(Icons.refresh, color: Colors.red.shade700),
+                  tooltip: 'Tekrar dene',
+                ),
+            ],
+          ),
+          if (onOpenSettings != null && settingsButtonLabel != null) ...[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: onOpenSettings,
+              icon: const Icon(Icons.settings, size: 18),
+              label: Text(settingsButtonLabel!),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.red.shade800,
+                side: BorderSide(color: Colors.red.shade300),
               ),
             ),
-          ),
-          if (onRetry != null)
-            IconButton(
-              onPressed: onRetry,
-              icon: Icon(Icons.refresh, color: Colors.red.shade700),
-              tooltip: 'Tekrar dene',
-            ),
+          ],
         ],
       ),
     );

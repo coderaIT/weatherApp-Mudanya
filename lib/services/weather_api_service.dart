@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../models/city_suggestion.dart';
 import '../models/weather_model.dart';
 import '../utils/constants.dart';
 
@@ -132,6 +133,82 @@ class WeatherApiService {
     _handleErrorResponse(response);
   }
 
+  /// Yazarken şehir önerileri (API + popüler şehirler).
+  Future<List<CitySuggestion>> searchCitySuggestions(String query) async {
+    final trimmed = query.trim();
+    final popular = _filterPopularCities(trimmed);
+
+    if (trimmed.length < 2) {
+      return popular;
+    }
+
+    _ensureApiKeyConfigured();
+
+    try {
+      final uri = Uri.parse(AppConstants.geocodingUrl).replace(
+        queryParameters: {
+          'q': trimmed,
+          'limit': '8',
+          'appid': AppConstants.apiKey,
+        },
+      );
+
+      final response = await http.get(uri).timeout(_timeout);
+      if (response.statusCode != 200) {
+        return popular;
+      }
+
+      final List<dynamic> data = jsonDecode(response.body) as List<dynamic>;
+      final apiResults = data
+          .map((e) => CitySuggestion.fromJson(e as Map<String, dynamic>))
+          .where((c) => c.name.isNotEmpty)
+          .toList();
+
+      return _mergeSuggestions(popular, apiResults);
+    } catch (_) {
+      return popular;
+    }
+  }
+
+  List<CitySuggestion> _filterPopularCities(String query) {
+    final q = _normalize(query);
+    final all = AppConstants.popularCities
+        .map((e) => CitySuggestion.fromJson(e))
+        .toList();
+
+    if (q.isEmpty) return all;
+    return all
+        .where((c) => _normalize(c.displayLabel).contains(q))
+        .toList();
+  }
+
+  List<CitySuggestion> _mergeSuggestions(
+    List<CitySuggestion> popular,
+    List<CitySuggestion> api,
+  ) {
+    final seen = <String>{};
+    final merged = <CitySuggestion>[];
+
+    for (final item in [...popular, ...api]) {
+      final key =
+          '${item.name.toLowerCase()}|${item.lat.toStringAsFixed(2)}|${item.lon.toStringAsFixed(2)}';
+      if (seen.add(key)) merged.add(item);
+    }
+    return merged.take(10).toList();
+  }
+
+  String _normalize(String value) {
+    return value
+        .toLowerCase()
+        .replaceAll('ı', 'i')
+        .replaceAll('İ', 'i')
+        .replaceAll('ş', 's')
+        .replaceAll('ğ', 'g')
+        .replaceAll('ü', 'u')
+        .replaceAll('ö', 'o')
+        .replaceAll('ç', 'c');
+  }
+
   /// Geocoding API — şehir adından koordinat bulma.
   Future<Map<String, dynamic>> getCoordinatesByCity(String cityName) async {
     _ensureApiKeyConfigured();
@@ -178,6 +255,15 @@ class WeatherApiService {
     );
   }
 
+  /// Öneri listesinden doğrudan koordinat ile hava durumu.
+  Future<WeatherModel> fetchWeatherBySuggestion(CitySuggestion city) async {
+    return fetchWeatherByCoordinates(
+      lat: city.lat,
+      lon: city.lon,
+      cityName: city.name,
+    );
+  }
+
   /// Reverse Geocoding — GPS koordinatlarından şehir adı.
   Future<String> getCityNameFromCoordinates(double lat, double lon) async {
     if (!AppConstants.isApiKeyConfigured) {
@@ -200,12 +286,33 @@ class WeatherApiService {
         final List<dynamic> data = jsonDecode(response.body) as List<dynamic>;
         if (data.isNotEmpty) {
           final location = data.first as Map<String, dynamic>;
-          return location['name'] as String? ?? 'Konumunuz';
+          return _formatLocationName(location);
         }
       }
       return 'Konumunuz';
     } catch (_) {
       return 'Konumunuz';
     }
+  }
+
+  /// Reverse geocoding sonucundan okunabilir yer adı üretir.
+  String _formatLocationName(Map<String, dynamic> location) {
+    final localNames = location['local_names'];
+    if (localNames is Map<String, dynamic>) {
+      final tr = localNames['tr'] as String?;
+      if (tr != null && tr.isNotEmpty) return tr;
+      final ar = localNames['ar'] as String?;
+      if (ar != null && ar.isNotEmpty) return ar;
+    }
+
+    final name = location['name'] as String?;
+    final state = location['state'] as String?;
+    if (name != null && name.isNotEmpty) {
+      if (state != null && state.isNotEmpty) {
+        return '$name, $state';
+      }
+      return name;
+    }
+    return 'Konumunuz';
   }
 }

@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/city_suggestion.dart';
 import '../providers/weather_provider.dart';
 import '../utils/constants.dart';
+import '../widgets/city_autocomplete_field.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/error_widget.dart';
 import '../widgets/gradient_background.dart';
 import '../widgets/loading_widget.dart';
 import '../widgets/weather_card.dart';
 
-/// Şehir Ara — şehir adı ile hava durumu sorgulama.
+/// Şehir Ara — otomatik tamamlama ile hava durumu sorgulama.
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
 
@@ -40,6 +42,11 @@ class _SearchScreenState extends State<SearchScreen> {
     await context.read<WeatherProvider>().fetchWeatherByCity(city);
   }
 
+  Future<void> _onSuggestionSelected(CitySuggestion city) async {
+    setState(() => _validationError = null);
+    await context.read<WeatherProvider>().fetchWeatherBySuggestion(city);
+  }
+
   @override
   Widget build(BuildContext context) {
     return GradientBackground(
@@ -63,32 +70,25 @@ class _SearchScreenState extends State<SearchScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 8),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 20),
+                    child: Text(
+                      'Şehir yazın veya listeden seçin',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.white70,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: TextField(
+                    child: CityAutocompleteField(
                       controller: _cityController,
-                      style: const TextStyle(color: Color(0xFF1A237E)),
-                      decoration: InputDecoration(
-                        hintText: 'Şehir adı giriniz',
-                        hintStyle: TextStyle(color: Colors.grey.shade500),
-                        filled: true,
-                        fillColor: Colors.white.withValues(alpha: 0.95),
-                        prefixIcon: const Icon(
-                          Icons.search,
-                          color: Color(0xFF5C6BC0),
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 16,
-                        ),
-                      ),
-                      textInputAction: TextInputAction.search,
-                      onSubmitted: (_) => _searchWeather(),
+                      onSearchSubmitted: _searchWeather,
+                      onSuggestionSelected: _onSuggestionSelected,
                     ),
                   ),
                   if (_validationError != null) ...[

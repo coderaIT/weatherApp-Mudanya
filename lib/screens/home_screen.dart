@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/weather_provider.dart';
+import '../services/location_service.dart';
 import '../utils/constants.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/error_widget.dart';
@@ -17,6 +18,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final LocationService _locationService = LocationService();
+
   @override
   void initState() {
     super.initState();
@@ -76,6 +79,16 @@ class _HomeScreenState extends State<HomeScreen> {
                     ErrorDisplayWidget(
                       message: provider.homeErrorMessage!,
                       onRetry: () => provider.loadDefaultWeather(),
+                      settingsButtonLabel: provider.homeErrorNeedsAppSettings
+                          ? 'Uygulama ayarlarını aç'
+                          : provider.homeErrorNeedsLocationService
+                              ? 'Konum ayarlarını aç'
+                              : null,
+                      onOpenSettings: provider.homeErrorNeedsAppSettings
+                          ? () => _locationService.openAppSettings()
+                          : provider.homeErrorNeedsLocationService
+                              ? () => _locationService.openLocationSettings()
+                              : null,
                     )
                   else if (provider.homeWeather != null)
                     WeatherCard(weather: provider.homeWeather!),

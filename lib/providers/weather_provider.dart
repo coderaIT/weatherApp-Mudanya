@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
+import '../models/city_suggestion.dart';
 import '../models/weather_model.dart';
-import '../services/location_service.dart';
+import '../services/location_service.dart' show LocationService, LocationServiceException;
 import '../services/weather_api_service.dart';
 import '../utils/constants.dart';
 
@@ -27,6 +28,42 @@ class WeatherProvider extends ChangeNotifier {
   WeatherModel? get searchWeather => _searchWeather;
   bool get searchIsLoading => _searchLoading;
   String? get searchErrorMessage => _searchError;
+
+  /// Önce GPS, izin yoksa veya hata olursa varsayılan şehir (Bursa).
+  Future<void> loadHomeWeather() async {
+    _homeLoading = true;
+    _homeError = null;
+    notifyListeners();
+
+    try {
+      final position = await _locationService.getCurrentPosition();
+      final cityName = await _apiService.getCityNameFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+      _homeWeather = await _apiService.fetchWeatherByCoordinates(
+        lat: position.latitude,
+        lon: position.longitude,
+        cityName: cityName,
+      );
+      _homeError = null;
+    } catch (_) {
+      try {
+        _homeWeather = await _apiService.fetchWeatherByCoordinates(
+          lat: AppConstants.defaultLat,
+          lon: AppConstants.defaultLon,
+          cityName: AppConstants.defaultCity,
+        );
+        _homeError = null;
+      } catch (e) {
+        _homeError = _parseError(e);
+        _homeWeather = null;
+      }
+    } finally {
+      _homeLoading = false;
+      notifyListeners();
+    }
+  }
 
   /// Varsayılan şehir (Bursa) hava durumunu yükler.
   Future<void> loadDefaultWeather() async {
@@ -66,6 +103,29 @@ class WeatherProvider extends ChangeNotifier {
     }
   }
 
+  /// Yazılan metne göre şehir önerileri.
+  Future<List<CitySuggestion>> searchCitySuggestions(String query) {
+    return _apiService.searchCitySuggestions(query);
+  }
+
+  /// Önerilen şehirden hava durumu getirir.
+  Future<void> fetchWeatherBySuggestion(CitySuggestion city) async {
+    _searchLoading = true;
+    _searchError = null;
+    notifyListeners();
+
+    try {
+      _searchWeather = await _apiService.fetchWeatherBySuggestion(city);
+      _searchError = null;
+    } catch (e) {
+      _searchError = _parseError(e);
+      _searchWeather = null;
+    } finally {
+      _searchLoading = false;
+      notifyListeners();
+    }
+  }
+
   /// Şehir adı ile arama ekranında hava durumu getirir.
   Future<void> fetchWeatherByCity(String cityName) async {
     _searchLoading = true;
@@ -100,8 +160,25 @@ class WeatherProvider extends ChangeNotifier {
     }
   }
 
+  bool get homeErrorNeedsAppSettings =>
+      _homeError == AppConstants.errorLocationPermissionForever;
+
+  bool get homeErrorNeedsLocationService =>
+      _homeError == AppConstants.errorLocationServiceDisabled;
+
   /// Hata mesajını Türkçe ve kullanıcı dostu hale getirir.
   String _parseError(Object e) {
+    if (e is LocationServiceException) {
+      switch (e.code) {
+        case LocationService.codeServiceDisabled:
+          return AppConstants.errorLocationServiceDisabled;
+        case LocationService.codePermissionDeniedForever:
+          return AppConstants.errorLocationPermissionForever;
+        case LocationService.codePermissionDenied:
+          return AppConstants.errorLocationPermission;
+      }
+    }
+
     final message = e.toString();
 
     if (message.contains(AppConstants.errorInvalidApiKey)) {
@@ -110,9 +187,19 @@ class WeatherProvider extends ChangeNotifier {
     if (message.contains(AppConstants.errorApiSubscription)) {
       return AppConstants.errorApiSubscription;
     }
+    if (message.contains(AppConstants.errorLocationPermissionForever) ||
+        message.contains('LOCATION_PERMISSION_DENIED_FOREVER') ||
+        message.contains('deniedForever')) {
+      return AppConstants.errorLocationPermissionForever;
+    }
+    if (message.contains(AppConstants.errorLocationServiceDisabled) ||
+        message.contains('LOCATION_SERVICE_DISABLED') ||
+        message.contains('Konum servisi kapalı')) {
+      return AppConstants.errorLocationServiceDisabled;
+    }
     if (message.contains(AppConstants.errorLocationPermission) ||
-        message.contains('Konum izni') ||
-        message.contains('Konum servisi')) {
+        message.contains('LOCATION_PERMISSION_DENIED') ||
+        message.contains('Konum izni')) {
       return AppConstants.errorLocationPermission;
     }
     if (message.contains(AppConstants.errorCityNotFound)) {

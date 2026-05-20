@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/weather_model.dart';
+import 'weather_animation.dart';
 
 /// Hava durumu bilgilerini modern bir kartta gösterir.
 class WeatherCard extends StatelessWidget {
@@ -34,34 +35,21 @@ class WeatherCard extends StatelessWidget {
               color: Color(0xFF1A237E),
             ),
           ),
+          const SizedBox(height: 12),
+          WeatherAnimation(
+            iconCode: weather.iconCode,
+            description: weather.description,
+            size: 150,
+          ),
           const SizedBox(height: 8),
-          // Hava ikonu ve açıklama
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Image.network(
-                weather.iconUrl,
-                width: 80,
-                height: 80,
-                errorBuilder: (context, error, stackTrace) => const Icon(
-                  Icons.wb_sunny,
-                  size: 64,
-                  color: Colors.orange,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  _capitalize(weather.description),
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 18,
-                    color: Colors.grey.shade700,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
+          Text(
+            _capitalize(weather.description),
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 18,
+              color: Colors.grey.shade700,
+              fontWeight: FontWeight.w500,
+            ),
           ),
           const SizedBox(height: 16),
           // Ana sıcaklık
